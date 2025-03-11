@@ -61,7 +61,7 @@
     "@auth/core": "latest",
     "nodemailer": "latest",
     "prisma": "latest",
-    "typescript": "latest",
+    
     "@prisma/client": "latest",
     "next-auth": "latest",
     "bcryptjs": "latest",
