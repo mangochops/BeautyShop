@@ -6,13 +6,13 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // User model for authentication
 model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid()) @map("_id") @db.Uuid
   name          String?
   email         String    @unique
   emailVerified DateTime?
@@ -36,14 +36,14 @@ enum Role {
 
 // Product model
 model Product {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid()) @map("_id") @db.Uuid
   name          String
   slug          String    @unique
   description   String
   price         Int
   originalPrice Int?
   images        ProductImage[]
-  categoryId    String    @db.ObjectId
+  categoryId    String    @db.Uuid
   category      Category  @relation(fields: [categoryId], references: [id])
   featured      Boolean   @default(false)
   inStock       Boolean   @default(true)
@@ -63,10 +63,10 @@ model Product {
 
 // Product Image model
 model ProductImage {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
   url       String
   alt       String?
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   isMain    Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -75,12 +75,12 @@ model ProductImage {
 
 // Category model
 model Category {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  id          String     @id @default(cuid()) @map("_id") @db.Uuid
   name        String
   slug        String     @unique
   description String?
   image       String?
-  parentId    String?    @db.ObjectId
+  parentId    String?    @db.Uuid
   parent      Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    Category[] @relation("CategoryToCategory")
   products    Product[]
@@ -90,8 +90,8 @@ model Category {
 
 // Order model
 model Order {
-  id              String     @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String?    @db.ObjectId
+  id              String     @id @default(cuid()) @map("_id") @db.Uuid
+  userId          String?    @db.Uuid
   user            User?      @relation(fields: [userId], references: [id])
   orderNumber     String     @unique
   status          OrderStatus @default(PENDING)
@@ -127,10 +127,10 @@ enum PaymentStatus {
 
 // Order Item model
 model OrderItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId   String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  orderId   String   @db.Uuid
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name      String
   price     Int
@@ -142,7 +142,7 @@ model OrderItem {
 
 // Cart model
 model Cart {
-  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  id        String     @id @default(cuid()) @map("_id") @db.Uuid
   sessionId String     @unique
   items     CartItem[]
   createdAt DateTime   @default(now())
@@ -151,10 +151,10 @@ model Cart {
 
 // Cart Item model
 model CartItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  cartId    String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  cartId    String   @db.Uuid
   cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   quantity  Int
   variant   String?
@@ -164,10 +164,10 @@ model CartItem {
 
 // Review model
 model Review {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  userId    String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   rating    Int
   title     String?
@@ -179,10 +179,10 @@ model Review {
 
 // Wishlist Item model
 model WishlistItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  userId    String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -192,8 +192,8 @@ model WishlistItem {
 
 // Address model
 model Address {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  userId    String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   street    String
@@ -216,8 +216,8 @@ enum AddressType {
 
 // Product Attribute model
 model ProductAttribute {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  productId String   @db.ObjectId
+  id        String   @id @default(cuid()) @map("_id") @db.Uuid
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name      String
   value     String
@@ -230,7 +230,7 @@ model ProductAttribute {
 // Product Variant model
 model ProductVariant {
   id        String   @id @default(cuid()) @map("_id")
-  productId String   @db.ObjectId
+  productId String   @db.Uuid
   product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   name      String
   sku       String?  @unique
