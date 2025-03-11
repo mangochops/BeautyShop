@@ -1,15 +1,36 @@
-import Link from "next/link"
-import { ArrowRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { getFeaturedProducts, getCategories } from "@/lib/products"
-import ProductCard from "@/components/product-card"
-import CategoryCard from "@/components/category-card"
-import HeroSection from "@/components/hero-section"
-import TestimonialSection from "@/components/testimonial-section"
+"use client"
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { getFeaturedProducts, getCategories, Product, Category } from "@/lib/products";
+import ProductCard from "@/components/product-card";
+import CategoryCard from "@/components/category-card";
+import HeroSection from "@/components/hero-section";
+import TestimonialSection from "@/components/testimonial-section";
 
 export default function Home() {
-  const featuredProducts = getFeaturedProducts()
-  const categories = getCategories()
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const products = await getFeaturedProducts();
+        const categoryList = await getCategories();
+        console.log("Fetched Products:", products);
+        console.log("Fetched Categories:", categoryList);
+        setFeaturedProducts(Array.isArray(products) ? products : []);
+        setCategories(Array.isArray(categoryList) ? categoryList : []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setFeaturedProducts([]); // Ensure default value
+        setCategories([]);
+      }
+    };
+    fetchData();
+  }, []);
+  
 
   return (
     <main className="flex-1">
@@ -20,9 +41,13 @@ export default function Home() {
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-8">Shop by Category</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {categories.map((category) => (
-              <CategoryCard key={category.id} category={category} />
-            ))}
+            {categories.length > 0 ? (
+              categories.map((category: Category) => (
+                <CategoryCard key={category.id} category={category} />
+              ))
+            ) : (
+              <p className="text-center col-span-full">No categories found.</p>
+            )}
           </div>
         </div>
       </section>
@@ -37,9 +62,13 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+            {featuredProducts.length > 0 ? (
+              featuredProducts.map((product: Product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            ) : (
+              <p className="text-center col-span-full">No featured products available.</p>
+            )}
           </div>
         </div>
       </section>
@@ -70,6 +99,9 @@ export default function Home() {
 
       <TestimonialSection />
     </main>
-  )
+  );
 }
+
+
+
 

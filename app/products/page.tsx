@@ -7,9 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Search, SlidersHorizontal } from "lucide-react"
 import { Star } from "lucide-react"
 
-export default function ProductsPage() {
-  const products = getProducts()
-  const categories = getCategories()
+export default async function ProductsPage() {
+  const products = await getProducts();
+  if (!Array.isArray(products)) {
+    console.error("getProducts() did not return an array:", products);
+  }
+
+  const categories = await getCategories();
 
   return (
     <div className="container mx-auto px-4 py-8">
