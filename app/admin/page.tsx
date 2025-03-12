@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/format";
 
-// Updated Order interface to match Prisma result
+// Define Order interface to match Prisma schema
 interface Order {
   id: string;
   orderNumber: string;
-  createdAt: Date; // Changed from string to Date
-  status: string;
+  createdAt: Date;
+  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   total: number;
   user?: {
-    name: string | null; // Allow null as per Prisma result
+    name: string | null;
     email: string;
   } | null;
   items: {
@@ -31,18 +31,98 @@ interface Order {
   }[];
 }
 
+// Define Product interface for low stock products
+interface LowStockProduct {
+  id: string;
+  name: string;
+  stockQuantity: number;
+}
+
 interface AdminDashboardProps {
   productsCount: number;
   ordersCount: number;
   customersCount: number;
   totalSales: number;
-  lowStockProducts: any[]; // Consider defining a Product interface
+  lowStockProducts: LowStockProduct[];
   pendingOrders: number;
   recentOrders: Order[];
 }
 
 export default async function AdminDashboard() {
-  const [
+  let productsCount = 0;
+  let ordersCount = 0;
+  let customersCount = 0;
+  let totalSales = 0;
+  let lowStockProducts: LowStockProduct[] = [];
+  let pendingOrders = 0;
+  let recentOrders: Order[] = [];
+
+  try {
+    const [
+      productsCountResult,
+      ordersCountResult,
+      customersCountResult,
+      totalSalesResult,
+      lowStockProductsResult,
+      pendingOrdersResult,
+      recentOrdersResult,
+    ] = await Promise.all([
+      prisma.product.count().catch((error) => {
+        console.error("Failed to count products:", error);
+        return 0;
+      }),
+      prisma.order.count().catch((error) => {
+        console.error("Failed to count orders:", error);
+        return 0;
+      }),
+      prisma.user.count({ where: { role: "USER" } }).catch((error) => {
+        console.error("Failed to count customers:", error);
+        return 0;
+      }),
+      prisma.order.aggregate({
+        where: { status: { in: ["DELIVERED", "SHIPPED"] } },
+        _sum: { total: true },
+      }).catch((error) => {
+        console.error("Failed to aggregate total sales:", error);
+        return { _sum: { total: 0 } };
+      }),
+      prisma.product.findMany({
+        where: { stockQuantity: { lte: 10 }, inStock: true },
+        take: 5,
+        select: { id: true, name: true, stockQuantity: true },
+      }).catch((error) => {
+        console.error("Failed to fetch low stock products:", error);
+        return [];
+      }),
+      prisma.order.count({ where: { status: "PENDING" } }).catch((error) => {
+        console.error("Failed to count pending orders:", error);
+        return 0;
+      }),
+      prisma.order.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { name: true, email: true } },
+          items: true,
+        },
+      }).catch((error) => {
+        console.error("Failed to fetch recent orders:", error);
+        return [];
+      }),
+    ]);
+
+    productsCount = productsCountResult;
+    ordersCount = ordersCountResult;
+    customersCount = customersCountResult;
+    totalSales = totalSalesResult._sum.total ?? 0; // Handle null with default 0
+    lowStockProducts = lowStockProductsResult;
+    pendingOrders = pendingOrdersResult;
+    recentOrders = recentOrdersResult;
+  } catch (error) {
+    console.error("Unexpected error in AdminDashboard data fetching:", error);
+  }
+
+  const props: AdminDashboardProps = {
     productsCount,
     ordersCount,
     customersCount,
@@ -50,63 +130,10 @@ export default async function AdminDashboard() {
     lowStockProducts,
     pendingOrders,
     recentOrders,
-  ] = await Promise.all([
-    prisma.product.count(),
-    prisma.order.count(),
-    prisma.user.count({ where: { role: "USER" } }),
-    prisma.order.aggregate({
-      where: {
-        status: {
-          in: ["DELIVERED", "SHIPPED"],
-        },
-      },
-      _sum: {
-        total: true,
-      },
-    }),
-    prisma.product.findMany({
-      where: {
-        stockQuantity: {
-          lte: 10,
-        },
-        inStock: true,
-      },
-      take: 5,
-    }),
-    prisma.order.count({
-      where: {
-        status: "PENDING",
-      },
-    }),
-    prisma.order.findMany({
-      take: 5,
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-        items: true, // Matches the items field in the Order interface
-      },
-    }),
-  ]);
-
-  const props: AdminDashboardProps = {
-    productsCount,
-    ordersCount,
-    customersCount,
-    totalSales: totalSales._sum.total || 0,
-    lowStockProducts,
-    pendingOrders,
-    recentOrders,
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -122,7 +149,7 @@ export default async function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(props.totalSales || 0)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(props.totalSales)}</div>
             <p className="text-xs text-muted-foreground">+12.5% from last month</p>
           </CardContent>
         </Card>
@@ -162,58 +189,70 @@ export default async function AdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>Showing the latest {props.recentOrders.length} orders.</CardDescription>
+          <CardDescription>
+            {props.recentOrders.length > 0
+              ? `Showing the latest ${props.recentOrders.length} orders`
+              : "No recent orders available"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {props.recentOrders.map((order: Order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">#{order.orderNumber}</TableCell>
-                  <TableCell>{order.user?.name || "Guest"}</TableCell>
-                  <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        order.status === "DELIVERED"
-                          ? "bg-green-500"
-                          : order.status === "SHIPPED"
-                          ? "bg-blue-500"
-                          : order.status === "PENDING"
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                      }
-                    >
-                      {order.status.toLowerCase()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{formatCurrency(order.total)}</TableCell>
-                  <TableCell className="text-right">
-                    <Link href={`/admin/orders/${order.id}`}>
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <div className="mt-4 flex justify-end">
-            <Link href="/admin/orders">
-              <Button variant="outline">View All Orders</Button>
-            </Link>
-          </div>
+          {props.recentOrders.length > 0 ? (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {props.recentOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">#{order.orderNumber}</TableCell>
+                      <TableCell>{order.user?.name || order.user?.email || "Guest"}</TableCell>
+                      <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            order.status === "DELIVERED"
+                              ? "bg-green-500"
+                              : order.status === "SHIPPED"
+                              ? "bg-blue-500"
+                              : order.status === "PENDING"
+                              ? "bg-yellow-500"
+                              : order.status === "PROCESSING"
+                              ? "bg-orange-500"
+                              : "bg-red-500"
+                          }
+                        >
+                          {order.status.toLowerCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatCurrency(order.total)}</TableCell>
+                      <TableCell className="text-right">
+                        <Link href={`/admin/orders/${order.id}`}>
+                          <Button variant="ghost" size="sm">
+                            View
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="mt-4 flex justify-end">
+                <Link href="/admin/orders">
+                  <Button variant="outline">View All Orders</Button>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground">No orders to display</p>
+          )}
         </CardContent>
       </Card>
 
@@ -226,11 +265,11 @@ export default async function AdminDashboard() {
           <div className="space-y-4">
             {props.lowStockProducts.length > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
-                <AlertCircle className="mt-0.5 h-5 w-5 text-red-500" />
+                <AlertCircle className="mt-0.5 h-5 w-5 text-red-5 00" />
                 <div>
                   <h4 className="font-semibold">Low Stock Alert</h4>
                   <p className="text-sm text-muted-foreground">
-                    {props.lowStockProducts.length} products are running low on inventory.
+                    {props.lowStockProducts.length} products are running low on inventory
                   </p>
                   <Link href="/admin/products?filter=low-stock" className="text-sm text-pink-600 hover:underline">
                     View Products
@@ -243,26 +282,37 @@ export default async function AdminDashboard() {
                 <Clock className="mt-0.5 h-5 w-5 text-yellow-500" />
                 <div>
                   <h4 className="font-semibold">Pending Orders</h4>
-                  <p className="text-sm text-muted-foreground">{props.pendingOrders} orders are pending fulfillment.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {props.pendingOrders} orders are pending fulfillment
+                  </p>
                   <Link href="/admin/orders?status=PENDING" className="text-sm text-pink-600 hover:underline">
                     View Orders
                   </Link>
                 </div>
               </div>
             )}
-            <div className="flex items-start gap-4 rounded-lg border p-4">
-              <TrendingUp className="mt-0.5 h-5 w-5 text-green-500" />
-              <div>
-                <h4 className="font-semibold">Sales Increase</h4>
-                <p className="text-sm text-muted-foreground">Sales have increased by 15% this week.</p>
-                <Link href="/admin/reports/sales" className="text-sm text-pink-600 hover:underline">
-                  View Report
-                </Link>
+            {props.totalSales > 0 && (
+              <div className="flex items-start gap-4 rounded-lg border p-4">
+                <TrendingUp className="mt-0.5 h-5 w-5 text-green-500" />
+                <div>
+                  <h4 className="font-semibold">Sales Update</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Total sales: {formatCurrency(props.totalSales)}
+                  </p>
+                  <Link href="/admin/reports/sales" className="text-sm text-pink-600 hover:underline">
+                    View Report
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
+            {props.lowStockProducts.length === 0 && props.pendingOrders === 0 && props.totalSales === 0 && (
+              <p className="text-sm text-muted-foreground">No alerts or notifications at this time</p>
+            )}
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
+
+export const revalidate = 3600; // Revalidate every hour (ISR)
