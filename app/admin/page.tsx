@@ -7,16 +7,28 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/format";
 
+// Updated Order interface to match Prisma result
 interface Order {
   id: string;
   orderNumber: string;
-  createdAt: string;
+  createdAt: Date; // Changed from string to Date
   status: string;
   total: number;
   user?: {
-    name: string;
+    name: string | null; // Allow null as per Prisma result
     email: string;
   } | null;
+  items: {
+    id: string;
+    name: string;
+    createdAt: Date;
+    updatedAt: Date;
+    productId: string;
+    price: number;
+    orderId: string;
+    quantity: number;
+    variant: string | null;
+  }[];
 }
 
 interface AdminDashboardProps {
@@ -24,20 +36,75 @@ interface AdminDashboardProps {
   ordersCount: number;
   customersCount: number;
   totalSales: number;
-  lowStockProducts: any[];
+  lowStockProducts: any[]; // Consider defining a Product interface
   pendingOrders: number;
   recentOrders: Order[];
 }
 
-export default function AdminDashboard({
-  productsCount,
-  ordersCount,
-  customersCount,
-  totalSales,
-  lowStockProducts,
-  pendingOrders,
-  recentOrders,
-}: AdminDashboardProps) {
+export default async function AdminDashboard() {
+  const [
+    productsCount,
+    ordersCount,
+    customersCount,
+    totalSales,
+    lowStockProducts,
+    pendingOrders,
+    recentOrders,
+  ] = await Promise.all([
+    prisma.product.count(),
+    prisma.order.count(),
+    prisma.user.count({ where: { role: "USER" } }),
+    prisma.order.aggregate({
+      where: {
+        status: {
+          in: ["DELIVERED", "SHIPPED"],
+        },
+      },
+      _sum: {
+        total: true,
+      },
+    }),
+    prisma.product.findMany({
+      where: {
+        stockQuantity: {
+          lte: 10,
+        },
+        inStock: true,
+      },
+      take: 5,
+    }),
+    prisma.order.count({
+      where: {
+        status: "PENDING",
+      },
+    }),
+    prisma.order.findMany({
+      take: 5,
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+        items: true, // Matches the items field in the Order interface
+      },
+    }),
+  ]);
+
+  const props: AdminDashboardProps = {
+    productsCount,
+    ordersCount,
+    customersCount,
+    totalSales: totalSales._sum.total || 0,
+    lowStockProducts,
+    pendingOrders,
+    recentOrders,
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -55,7 +122,7 @@ export default function AdminDashboard({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSales || 0)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(props.totalSales || 0)}</div>
             <p className="text-xs text-muted-foreground">+12.5% from last month</p>
           </CardContent>
         </Card>
@@ -65,7 +132,7 @@ export default function AdminDashboard({
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ordersCount}</div>
+            <div className="text-2xl font-bold">{props.ordersCount}</div>
             <p className="text-xs text-muted-foreground">+8.2% from last month</p>
           </CardContent>
         </Card>
@@ -75,7 +142,7 @@ export default function AdminDashboard({
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customersCount}</div>
+            <div className="text-2xl font-bold">{props.customersCount}</div>
             <p className="text-xs text-muted-foreground">+5.7% from last month</p>
           </CardContent>
         </Card>
@@ -85,7 +152,7 @@ export default function AdminDashboard({
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{productsCount}</div>
+            <div className="text-2xl font-bold">{props.productsCount}</div>
             <p className="text-xs text-muted-foreground">+3 new this month</p>
           </CardContent>
         </Card>
@@ -95,7 +162,7 @@ export default function AdminDashboard({
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
-          <CardDescription>Showing the latest {recentOrders.length} orders.</CardDescription>
+          <CardDescription>Showing the latest {props.recentOrders.length} orders.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -110,7 +177,7 @@ export default function AdminDashboard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentOrders.map((order: Order) => (
+              {props.recentOrders.map((order: Order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">#{order.orderNumber}</TableCell>
                   <TableCell>{order.user?.name || "Guest"}</TableCell>
@@ -157,13 +224,13 @@ export default function AdminDashboard({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {lowStockProducts.length > 0 && (
+            {props.lowStockProducts.length > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
                 <AlertCircle className="mt-0.5 h-5 w-5 text-red-500" />
                 <div>
                   <h4 className="font-semibold">Low Stock Alert</h4>
                   <p className="text-sm text-muted-foreground">
-                    {lowStockProducts.length} products are running low on inventory.
+                    {props.lowStockProducts.length} products are running low on inventory.
                   </p>
                   <Link href="/admin/products?filter=low-stock" className="text-sm text-pink-600 hover:underline">
                     View Products
@@ -171,12 +238,12 @@ export default function AdminDashboard({
                 </div>
               </div>
             )}
-            {pendingOrders > 0 && (
+            {props.pendingOrders > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
                 <Clock className="mt-0.5 h-5 w-5 text-yellow-500" />
                 <div>
                   <h4 className="font-semibold">Pending Orders</h4>
-                  <p className="text-sm text-muted-foreground">{pendingOrders} orders are pending fulfillment.</p>
+                  <p className="text-sm text-muted-foreground">{props.pendingOrders} orders are pending fulfillment.</p>
                   <Link href="/admin/orders?status=PENDING" className="text-sm text-pink-600 hover:underline">
                     View Orders
                   </Link>
@@ -198,88 +265,4 @@ export default function AdminDashboard({
       </Card>
     </div>
   );
-}
-
-export async function getServerSideProps() {
-  try {
-    const [
-      productsCount,
-      ordersCount,
-      customersCount,
-      totalSales,
-      lowStockProducts,
-      pendingOrders,
-      recentOrders,
-    ] = await Promise.all([
-      prisma.product.count(),
-      prisma.order.count(),
-      prisma.user.count({ where: { role: "USER" } }),
-      prisma.order.aggregate({
-        where: {
-          status: {
-            in: ["DELIVERED", "SHIPPED"],
-          },
-        },
-        _sum: {
-          total: true,
-        },
-      }),
-      prisma.product.findMany({
-        where: {
-          stockQuantity: {
-            lte: 10,
-          },
-          inStock: true,
-        },
-        take: 5,
-      }),
-      prisma.order.count({
-        where: {
-          status: "PENDING",
-        },
-      }),
-      prisma.order.findMany({
-        take: 5,
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-          items: true,
-        },
-      }),
-    ]);
-
-    return {
-      props: {
-        productsCount,
-        ordersCount,
-        customersCount,
-        totalSales: totalSales._sum.total || 0, // Handle null case
-        lowStockProducts,
-        pendingOrders,
-        recentOrders,
-      },
-    };
-  } catch (error) {
-    console.error("Error fetching admin dashboard data:", error);
-    return {
-      props: {
-        productsCount: 0,
-        ordersCount: 0,
-        customersCount: 0,
-        totalSales: 0,
-        lowStockProducts: [],
-        pendingOrders: 0,
-        recentOrders: [],
-      },
-    };
-  } finally {
-    await prisma.$disconnect();
-  }
 }
