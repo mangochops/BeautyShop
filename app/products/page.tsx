@@ -8,12 +8,30 @@ import { Search, SlidersHorizontal } from "lucide-react"
 import { Star } from "lucide-react"
 
 export default async function ProductsPage() {
-  const products = await getProducts();
-  if (!Array.isArray(products)) {
-    console.error("getProducts() did not return an array:", products);
+  let products: any[] = [];
+  let categories: any[] = [];
+
+  try {
+    products = await getProducts();
+    if (!Array.isArray(products)) {
+      console.error("getProducts() did not return an array:", products);
+      products = []; // Fallback to empty array
+    }
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    products = []; // Fallback to empty array
   }
 
-  const categories = await getCategories();
+  try {
+    categories = await getCategories();
+    if (!Array.isArray(categories)) {
+      console.error("getCategories() did not return an array:", categories);
+      categories = []; // Fallback to empty array
+    }
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    categories = []; // Fallback to empty array
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -25,14 +43,18 @@ export default async function ProductsPage() {
           <div>
             <h3 className="font-medium text-lg mb-3">Categories</h3>
             <div className="space-y-2">
-              {categories.map((category) => (
-                <div key={category.id} className="flex items-center space-x-2">
-                  <Checkbox id={`category-${category.id}`} />
-                  <label htmlFor={`category-${category.id}`} className="text-sm">
-                    {category.name}
-                  </label>
-                </div>
-              ))}
+              {categories.length > 0 ? (
+                categories.map((category) => (
+                  <div key={category.id} className="flex items-center space-x-2">
+                    <Checkbox id={`category-${category.id}`} />
+                    <label htmlFor={`category-${category.id}`} className="text-sm">
+                      {category.name}
+                    </label>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No categories available</p>
+              )}
             </div>
           </div>
 
@@ -86,41 +108,48 @@ export default async function ProductsPage() {
 
         {/* Products Grid */}
         <div className="flex-1">
-          {/* Search */}
           <div className="relative mb-6">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input placeholder="Search products..." className="pl-10" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {products.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500">No products available</p>
+          )}
 
           {/* Pagination */}
-          <div className="mt-8 flex justify-center">
-            <nav className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" disabled>
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" className="bg-pink-600 text-white">
-                1
-              </Button>
-              <Button variant="outline" size="sm">
-                2
-              </Button>
-              <Button variant="outline" size="sm">
-                3
-              </Button>
-              <Button variant="outline" size="sm">
-                Next
-              </Button>
-            </nav>
-          </div>
+          {products.length > 0 && (
+            <div className="mt-8 flex justify-center">
+              <nav className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" disabled>
+                  Previous
+                </Button>
+                <Button variant="outline" size="sm" className="bg-pink-600 text-white">
+                  1
+                </Button>
+                <Button variant="outline" size="sm">
+                  2
+                </Button>
+                <Button variant="outline" size="sm">
+                  3
+                </Button>
+                <Button variant="outline" size="sm">
+                  Next
+                </Button>
+              </nav>
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
+// Optional: Add revalidation if using ISR
+export const revalidate = 3600; // Revalidate every hour

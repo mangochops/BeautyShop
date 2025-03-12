@@ -3,6 +3,7 @@ export type Category = {
   name: string;
   slug: string;
   image?: string;
+  productCount?: number; // Added this
 };
 
 
