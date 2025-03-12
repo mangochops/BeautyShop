@@ -1,60 +1,43 @@
-import Link from "next/link"
-import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Clock, AlertCircle } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { prisma } from "@/lib/prisma"
-import { formatCurrency } from "@/lib/format"
+import Link from "next/link";
+import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Clock, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { prisma } from "@/lib/prisma";
+import { formatCurrency } from "@/lib/format";
 
-export default async function AdminDashboard() {
-  // Get dashboard stats
-  const [productsCount, ordersCount, customersCount, totalSales, lowStockProducts, pendingOrders, recentOrders] =
-    await Promise.all([
-      prisma.product.count(),
-      prisma.order.count(),
-      prisma.user.count({ where: { role: "USER" } }),
-      prisma.order.aggregate({
-        where: {
-          status: {
-            in: ["DELIVERED", "SHIPPED"],
-          },
-        },
-        _sum: {
-          total: true,
-        },
-      }),
-      prisma.product.findMany({
-        where: {
-          stockQuantity: {
-            lte: 10,
-          },
-          inStock: true,
-        },
-        take: 5,
-      }),
-      prisma.order.count({
-        where: {
-          status: "PENDING",
-        },
-      }),
-      prisma.order.findMany({
-        take: 5,
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-          items: true,
-        },
-      }),
-    ])
+interface Order {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  status: string;
+  total: number;
+  user?: {
+    name: string;
+    email: string;
+  } | null;
+}
 
+interface AdminDashboardProps {
+  productsCount: number;
+  ordersCount: number;
+  customersCount: number;
+  totalSales: number;
+  lowStockProducts: any[];
+  pendingOrders: number;
+  recentOrders: Order[];
+}
+
+export default function AdminDashboard({
+  productsCount,
+  ordersCount,
+  customersCount,
+  totalSales,
+  lowStockProducts,
+  pendingOrders,
+  recentOrders,
+}: AdminDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -72,7 +55,7 @@ export default async function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSales._sum.total || 0)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalSales || 0)}</div>
             <p className="text-xs text-muted-foreground">+12.5% from last month</p>
           </CardContent>
         </Card>
@@ -127,7 +110,7 @@ export default async function AdminDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recentOrders.map((order) => (
+              {recentOrders.map((order: Order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">#{order.orderNumber}</TableCell>
                   <TableCell>{order.user?.name || "Guest"}</TableCell>
@@ -138,10 +121,10 @@ export default async function AdminDashboard() {
                         order.status === "DELIVERED"
                           ? "bg-green-500"
                           : order.status === "SHIPPED"
-                            ? "bg-blue-500"
-                            : order.status === "PENDING"
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
+                          ? "bg-blue-500"
+                          : order.status === "PENDING"
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
                       }
                     >
                       {order.status.toLowerCase()}
@@ -214,6 +197,89 @@ export default async function AdminDashboard() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
+export async function getServerSideProps() {
+  try {
+    const [
+      productsCount,
+      ordersCount,
+      customersCount,
+      totalSales,
+      lowStockProducts,
+      pendingOrders,
+      recentOrders,
+    ] = await Promise.all([
+      prisma.product.count(),
+      prisma.order.count(),
+      prisma.user.count({ where: { role: "USER" } }),
+      prisma.order.aggregate({
+        where: {
+          status: {
+            in: ["DELIVERED", "SHIPPED"],
+          },
+        },
+        _sum: {
+          total: true,
+        },
+      }),
+      prisma.product.findMany({
+        where: {
+          stockQuantity: {
+            lte: 10,
+          },
+          inStock: true,
+        },
+        take: 5,
+      }),
+      prisma.order.count({
+        where: {
+          status: "PENDING",
+        },
+      }),
+      prisma.order.findMany({
+        take: 5,
+        orderBy: {
+          createdAt: "desc",
+        },
+        include: {
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+          items: true,
+        },
+      }),
+    ]);
+
+    return {
+      props: {
+        productsCount,
+        ordersCount,
+        customersCount,
+        totalSales: totalSales._sum.total || 0, // Handle null case
+        lowStockProducts,
+        pendingOrders,
+        recentOrders,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching admin dashboard data:", error);
+    return {
+      props: {
+        productsCount: 0,
+        ordersCount: 0,
+        customersCount: 0,
+        totalSales: 0,
+        lowStockProducts: [],
+        pendingOrders: 0,
+        recentOrders: [],
+      },
+    };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
