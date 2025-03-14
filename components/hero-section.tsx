@@ -17,7 +17,7 @@ export default function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/50 to-transparent z-10"></div>
 
       {/* Content */}
-      <div className="relative z-20 container mx-auto px-4 py-10 md:py-16 lg:py-24">
+      <div className="flex z-20 container mx-auto px-4 py-10 md:py-16 lg:py-24">
         <div className="flex flex-col items-center gap-8 md:gap-12 text-center">
           <div className="max-w-3xl">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-4 md:mb-6 leading-tight tracking-tight">
@@ -53,7 +53,7 @@ export default function HeroSection() {
       </div>
 
       {/* Features Section */}
-      <div className="relative z-20 container mx-auto px-4 mt-12 md:mt-16">
+      <div className="flex z-20 container mx-auto px-4 mt-12 md:mt-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
           <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-4 md:p-6 rounded-2xl shadow-md text-center transition-all hover:shadow-lg hover:-translate-y-1">
             <div className="w-12 h-12 md:w-14 md:h-14 bg-pink-100 dark:bg-pink-800 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
