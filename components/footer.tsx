@@ -125,11 +125,11 @@ export default function Footer() {
             <h4 className="font-bold text-lg mb-4">Contact</h4>
             <address className="not-italic text-gray-600 mb-4">
               <p>123 Beauty Lane</p>
-              <p>New York, NY 10001</p>
-              <p>United States</p>
+              <p>Nairobi GPO</p>
+              <p>Kenya</p>
               <p className="mt-2">
                 <a href="mailto:hello@beautyshop.com" className="hover:text-pink-600">
-                  hello@beautyshop.com
+                  hello@glowshop.com
                 </a>
               </p>
               <p>
@@ -159,7 +159,7 @@ export default function Footer() {
         <div className="border-t border-gray-200 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-600 text-sm mb-4 md:mb-0">
-              © {new Date().getFullYear()} BeautyShop. All rights reserved.
+              © {new Date().getFullYear()} GlowShop. All rights reserved.
             </p>
 
             <div className="flex items-center space-x-4">
