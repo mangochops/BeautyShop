@@ -1,4 +1,6 @@
 import type React from "react"
+import { StackProvider, StackTheme } from "@stackframe/stack";
+import { stackServerApp } from "../stack";
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
@@ -10,7 +12,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Beauty Shop - Premium Beauty Products",
+  title: "Glow Shop - Premium Beauty Products",
   description: "Shop the finest beauty products for skincare, makeup, haircare, and more.",
     generator: 'v0.dev'
 }
@@ -22,7 +24,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter.className}><StackProvider app={stackServerApp}><StackTheme>
         <ThemeProvider>
           <CartProvider>
             <div className="flex flex-col min-h-screen">
@@ -32,7 +34,7 @@ export default function RootLayout({
             </div>
           </CartProvider>
         </ThemeProvider>
-      </body>
+      </StackTheme></StackProvider></body>
     </html>
   )
 }

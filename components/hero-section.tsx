@@ -1,5 +1,5 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function HeroSection() {
   return (
@@ -27,10 +27,13 @@ export default function HeroSection() {
             </div>
           </div>
           <div className="md:w-1/2">
-            <img
-              src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=600&auto=format&fit=crop"
-              alt="Beauty products showcase"
-              className="rounded-lg shadow-lg"
+            <video
+              src="/hero-video.mp4" // Replace with your video file path or URL
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="rounded-lg shadow-lg w-full h-auto"
             />
           </div>
         </div>
@@ -63,6 +66,5 @@ export default function HeroSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
-

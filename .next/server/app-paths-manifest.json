@@ -19,6 +19,7 @@
   "/api/products/route": "app/api/products/route.js",
   "/cart/page": "app/cart/page.js",
   "/checkout/page": "app/checkout/page.js",
+  "/handler/[...stack]/page": "app/handler/[...stack]/page.js",
   "/page": "app/page.js",
   "/products/[id]/page": "app/products/[id]/page.js",
   "/products/page": "app/products/page.js",

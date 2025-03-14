@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"lib/admin.ts -> @/lib/products":{"id":1178,"files":["static/chunks/1094-5ade584917cf7522.js","static/chunks/1178.9b4bda6f6f711e93.js"]}}';
+self.__REACT_LOADABLE_MANIFEST='{"lib/admin.ts -> @/lib/products":{"id":51178,"files":["static/chunks/1094-53ae32cdc3528dcc.js","static/chunks/1178.01153b3e556045ee.js"]}}';
