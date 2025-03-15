@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import  prisma  from "@/lib/prisma"
 import { cookies } from "next/headers"
 import { v4 as uuidv4 } from "uuid"
 
 // Helper function to get or create cart
 async function getOrCreateCart() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   let cartId = cookieStore.get("cartId")?.value
 
   if (!cartId) {

@@ -1,37 +1,39 @@
-import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { Role } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { searchParams } = new URL(request.url)
-    const page = Number.parseInt(searchParams.get("page") || "1")
-    const limit = Number.parseInt(searchParams.get("limit") || "10")
-    const search = searchParams.get("search") || ""
-    const sort = searchParams.get("sort") || "createdAt:desc"
+    const { searchParams } = new URL(request.url);
+    const page = Number.parseInt(searchParams.get("page") || "1");
+    const limit = Number.parseInt(searchParams.get("limit") || "10");
+    const search = searchParams.get("search") || "";
+    const sort = searchParams.get("sort") || "createdAt:desc";
 
-    const [field, order] = sort.split(":")
+    const [field, order] = sort.split(":");
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
 
+    // Define the where clause with proper typing
     const where = {
-      role: "USER",
+      role: Role.USER,
       ...(search
         ? {
             OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } },
+              { name: { contains: search, mode: "insensitive" as const } },
+              { email: { contains: search, mode: "insensitive" as const } },
             ],
           }
         : {}),
-    }
+    };
 
     const [customers, total] = await Promise.all([
       prisma.user.findMany({
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
           createdAt: true,
           _count: {
             select: {
-              orders: true,
+              orders: true, // Count of orders
             },
           },
           orders: {
@@ -55,7 +57,7 @@ export async function GET(request: Request) {
             orderBy: {
               createdAt: "desc",
             },
-            take: 1,
+            take: 1, // Get the most recent order
           },
         },
         orderBy: {
@@ -65,7 +67,7 @@ export async function GET(request: Request) {
         take: limit,
       }),
       prisma.user.count({ where }),
-    ])
+    ]);
 
     // Calculate total spent for each customer
     const customersWithTotalSpent = await Promise.all(
@@ -74,21 +76,21 @@ export async function GET(request: Request) {
           where: {
             userId: customer.id,
             status: {
-              in: ["DELIVERED", "SHIPPED"],
+              in: ["DELIVERED", "SHIPPED"], // Match enum values from schema
             },
           },
           _sum: {
             total: true,
           },
-        })
+        });
 
         return {
           ...customer,
           totalSpent: totalSpent._sum.total || 0,
-          lastOrder: customer.orders[0]?.createdAt || null,
-        }
+          lastOrder: customer.orders[0]?.createdAt || null, // Safe access to orders
+        };
       }),
-    )
+    );
 
     return NextResponse.json({
       customers: customersWithTotalSpent,
@@ -98,10 +100,9 @@ export async function GET(request: Request) {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-    })
+    });
   } catch (error) {
-    console.error("Error fetching customers:", error)
-    return NextResponse.json({ error: "Failed to fetch customers" }, { status: 500 })
+    console.error("Error fetching customers:", error);
+    return NextResponse.json({ error: "Failed to fetch customers" }, { status: 500 });
   }
 }
-

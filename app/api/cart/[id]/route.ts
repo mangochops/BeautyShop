@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import  prisma  from "@/lib/prisma"
 import { cookies } from "next/headers"
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
@@ -11,7 +11,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ error: "Quantity is required" }, { status: 400 })
     }
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const cartId = cookieStore.get("cartId")?.value
 
     if (!cartId) {
@@ -56,7 +56,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const cartId = cookieStore.get("cartId")?.value
 
     if (!cartId) {

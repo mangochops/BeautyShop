@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import  prisma  from "@/lib/prisma";
 import type { Product } from "@/types/product";
 import type { Category } from "@/types/category";
 
