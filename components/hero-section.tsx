@@ -13,9 +13,8 @@ export default function HeroSection() {
         playsInline
         className="absolute top-0 left-0 w-full h-full object-cover z-0"
       />
-      {/* Overlay with Increased Opacity */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/60 to-black/20 z-10"></div>
-
+      {/* Overlay with Reduced Opacity */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/40 to-black/10 z-10"></div>
       {/* Hero Content */}
       <div className="relative z-20 container mx-auto px-4 py-10 md:py-16 lg:py-24">
         <div className="flex flex-col items-center gap-8 md:gap-12 text-center">

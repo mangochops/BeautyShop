@@ -8,6 +8,7 @@ import ProductCard from "@/components/product-card";
 import CategoryCard from "@/components/category-card";
 import HeroSection from "@/components/hero-section";
 import TestimonialSection from "@/components/testimonial-section";
+import Image from "next/image";
 
 export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -87,9 +88,11 @@ export default function Home() {
               </Button>
             </div>
             <div className="md:w-1/2">
-              <img
-                src="/placeholder.svg?height=400&width=600"
+              <Image
+                src="/skincare.jpeg"
                 alt="Beauty products special offer"
+                width={600}
+                height={400}
                 className="rounded-lg shadow-lg"
               />
             </div>

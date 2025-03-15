@@ -12,6 +12,8 @@
     "@auth/core": "latest",
     "@auth/prisma-adapter": "latest",
     "@hookform/resolvers": "^3.9.1",
+    "@neondatabase/serverless": "^0.10.4",
+    "@prisma/adapter-neon": "^6.5.0",
     "@prisma/client": "latest",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",
