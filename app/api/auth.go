@@ -4,15 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-)
 
-// User represents a user in the system
-type User struct {
-	ID       string `json:"id"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Password string `json:"-"` // Never send password in response
-}
+	"beauty-shop/api/db"
+	"github.com/golang-jwt/jwt/v4"
+	"golang.org/x/crypto/bcrypt"
+)
 
 // LoginRequest represents the login request body
 type LoginRequest struct {
@@ -22,22 +18,26 @@ type LoginRequest struct {
 
 // LoginResponse represents the login response
 type LoginResponse struct {
-	Token string `json:"token"`
-	User  User   `json:"user"`
+	Token string  `json:"token"`
+	User  db.User `json:"user"`
 }
 
-// Sample user data (in a real app, this would come from a database)
-var users = []User{
-	{
-		ID:       "1",
-		Email:    "user@example.com",
-		Name:     "Test User",
-		Password: "password123", // In a real app, this would be hashed
-	},
+// JWT claims struct
+type Claims struct {
+	UserID string `json:"userId"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
 }
+
+// JWT secret key
+var jwtKey = []byte("your-secret-key") // In production, use an environment variable
 
 // Handler handles HTTP requests for authentication
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// Initialize database connection
+	db.Initialize()
+
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -63,32 +63,45 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find user by email
-	var user *User
-	for _, u := range users {
-		if u.Email == loginReq.Email {
-			user = &u
-			break
-		}
-	}
-
-	// Check if user exists and password is correct
-	if user == nil || user.Password != loginReq.Password {
+	var user db.User
+	if err := db.DB.Where("email = ?", loginReq.Email).First(&user).Error; err != nil {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
-	// In a real app, you would generate a JWT token here
-	// For simplicity, we'll just create a dummy token
-	token := "dummy-token-" + time.Now().Format(time.RFC3339)
+	// Check if password is correct
+	if user.Password == nil {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(loginReq.Password)); err != nil {
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Create JWT token
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &Claims{
+		UserID: user.ID.String(),
+		Email:  user.Email,
+		Role:   string(user.Role),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
 
 	// Create response
 	response := LoginResponse{
-		Token: token,
-		User: User{
-			ID:    user.ID,
-			Email: user.Email,
-			Name:  user.Name,
-		},
+		Token: tokenString,
+		User:  user,
 	}
 
 	// Set content type
@@ -96,5 +109,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	// Return response
 	json.NewEncoder(w).Encode(response)
+}  "application/json")
+
+	// Return response
+	json.NewEncoder(w).Encode(response)
 }
+
+
 
