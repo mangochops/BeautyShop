@@ -3,52 +3,16 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+
+	"beauty-shop/api/db"
 )
-
-// Product represents a beauty product
-type Product struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	ImageURL    string  `json:"imageUrl"`
-	Category    string  `json:"category"`
-	InStock     bool    `json:"inStock"`
-}
-
-// Sample product data (in a real app, this would come from a database)
-var products = []Product{
-	{
-		ID:          "1",
-		Name:        "Hydrating Face Cream",
-		Description: "A rich, moisturizing face cream for all skin types",
-		Price:       29.99,
-		ImageURL:    "/images/face-cream.jpg",
-		Category:    "skincare",
-		InStock:     true,
-	},
-	{
-		ID:          "2",
-		Name:        "Volumizing Mascara",
-		Description: "Adds volume and length to your lashes",
-		Price:       19.99,
-		ImageURL:    "/images/mascara.jpg",
-		Category:    "makeup",
-		InStock:     true,
-	},
-	{
-		ID:          "3",
-		Name:        "Argan Oil Hair Treatment",
-		Description: "Nourishing treatment for damaged hair",
-		Price:       34.99,
-		ImageURL:    "/images/hair-oil.jpg",
-		Category:    "haircare",
-		InStock:     true,
-	},
-}
 
 // Handler handles HTTP requests for the products endpoint
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// Initialize database connection
+	db.Initialize()
+
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -66,10 +30,75 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get query parameters
+	category := r.URL.Query().Get("category")
+	featured := r.URL.Query().Get("featured")
+	limit := r.URL.Query().Get("limit")
+	page := r.URL.Query().Get("page")
+
+	// Query products from database
+	query := db.DB.Preload("Images").Preload("Category")
+
+	// Filter by category if provided
+	if category != "" {
+		var categoryObj db.Category
+		if err := db.DB.Where("slug = ?", category).First(&categoryObj).Error; err == nil {
+			query = query.Where("category_id = ?", categoryObj.ID)
+		}
+	}
+
+	// Filter by featured if provided
+	if featured == "true" {
+		query = query.Where("featured = ?", true)
+	}
+
+	// Pagination
+	var pageSize int = 10 // Default page size
+	var pageNum int = 1   // Default page number
+
+	if limit != "" {
+		if parsedLimit, err := strconv.Atoi(limit); err == nil && parsedLimit > 0 {
+			pageSize = parsedLimit
+		}
+	}
+
+	if page != "" {
+		if parsedPage, err := strconv.Atoi(page); err == nil && parsedPage > 0 {
+			pageNum = parsedPage
+		}
+	}
+
+	// Calculate offset
+	offset := (pageNum - 1) * pageSize
+
+	// Get total count
+	var total int64
+	query.Model(&db.Product{}).Count(&total)
+
+	// Execute the query with pagination
+	var products []db.Product
+	if err := query.Limit(pageSize).Offset(offset).Find(&products).Error; err != nil {
+		http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare response
+	response := map[string]interface{}{
+		"products": products,
+		"pagination": map[string]interface{}{
+			"total":    total,
+			"page":     pageNum,
+			"pageSize": pageSize,
+			"pages":    (total + int64(pageSize) - 1) / int64(pageSize),
+		},
+	}
+
 	// Set content type
 	w.Header().Set("Content-Type", "application/json")
 
-	// Return all products
-	json.NewEncoder(w).Encode(products)
+	// Return products
+	json.NewEncoder(w).Encode(response)
 }
+
+
 
