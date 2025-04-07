@@ -3,10 +3,15 @@ package handler
 import (
 	"fmt"
 	"net/http"
+
+	"beauty-shop/api/db"
 )
 
 // Handler handles HTTP requests for the root endpoint
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// Initialize database connection
+	db.Initialize()
+
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -65,10 +70,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				<ul>
 					<li><code>GET /api</code> - This documentation</li>
 					<li><code>GET /api/products</code> - Get all products</li>
-					<li><code>GET /api/product?id=1</code> - Get a specific product</li>
+					<li><code>GET /api/product?id=X</code> or <code>GET /api/product?slug=X</code> - Get a specific product</li>
+					<li><code>GET /api/categories</code> - Get all categories</li>
+					<li><code>GET /api/categories?slug=X</code> - Get a specific category</li>
 					<li><code>POST /api/auth</code> - Authenticate a user</li>
 					<li><code>GET /api/orders</code> - Get all orders (requires authentication)</li>
 					<li><code>POST /api/orders</code> - Create a new order (requires authentication)</li>
+					<li><code>GET /api/settings</code> - Get store settings</li>
 				</ul>
 			</body>
 		</html>
