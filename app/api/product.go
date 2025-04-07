@@ -3,11 +3,16 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
+
+	"beauty-shop/api/db"
+	"github.com/gofrs/uuid"
 )
 
 // Handler handles HTTP requests for a single product
 func Handler(w http.ResponseWriter, r *http.Request) {
+	// Initialize database connection
+	db.Initialize()
+
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -25,27 +30,36 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get product ID from the URL path
-	// The URL will be like /api/product?id=1
+	// Get product ID or slug from the URL path
 	productID := r.URL.Query().Get("id")
-	if productID == "" {
-		http.Error(w, "Product ID is required", http.StatusBadRequest)
+	productSlug := r.URL.Query().Get("slug")
+
+	if productID == "" && productSlug == "" {
+		http.Error(w, "Product ID or slug is required", http.StatusBadRequest)
 		return
 	}
 
 	// Find the product
-	var product *Product
-	for _, p := range products {
-		if p.ID == productID {
-			product = &p
-			break
-		}
-	}
+	var product db.Product
+	query := db.DB.Preload("Images").Preload("Category").Preload("Attributes")
 
-	// If product not found
-	if product == nil {
-		http.Error(w, "Product not found", http.StatusNotFound)
-		return
+	if productID != "" {
+		// Parse UUID
+		id, err := uuid.FromString(productID)
+		if err != nil {
+			http.Error(w, "Invalid product ID", http.StatusBadRequest)
+			return
+		}
+
+		if err := query.First(&product, "id = ?", id).Error; err != nil {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
+	} else {
+		if err := query.Where("slug = ?", productSlug).First(&product).Error; err != nil {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	// Set content type
@@ -54,4 +68,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// Return the product
 	json.NewEncoder(w).Encode(product)
 }
+
+
 
