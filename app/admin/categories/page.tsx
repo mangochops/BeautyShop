@@ -6,6 +6,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getCategories } from "@/lib/products"
 import DeleteCategoryButton from "@/components/admin/delete-category-button"
 
+async function fetchCategories() {
+  try {
+    const response = await axios.get("http://glowshop.vercel.app/categories");
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    return [];
+  }
+}
 export default async function CategoriesPage() {
   const categories = await getCategories()
 
