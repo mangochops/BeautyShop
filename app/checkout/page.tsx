@@ -12,7 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreditCard, CheckCircle2, ArrowLeft, LockIcon } from "lucide-react"
 import { useCart } from "@/hooks/use-cart"
 import OrderSummary from "@/components/order-summary"
-import { formatCurrency } from "@/lib/format"
+import axios from "axios"
+
+async function fetchCurrencyFormat(price: number) {
+  try {
+    const response = await axios.get(`http://glowshop.vercel.app/format-currency?price=${price}`)
+    return response.data.formattedPrice
+  } catch (error) {
+    console.error("Failed to fetch currency format:", error)
+    return price.toFixed(2) // Fallback to a basic format
+  }
+}
 
 export default function CheckoutPage() {
   const { cart, cartTotal } = useCart()
