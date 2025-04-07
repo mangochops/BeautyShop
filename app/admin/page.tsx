@@ -1,136 +1,171 @@
-import Link from "next/link";
-import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Clock, AlertCircle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import  prisma  from "@/lib/prisma";
-import { formatCurrency } from "@/lib/format";
+"use client"
 
-// Define Order interface to match Prisma schema
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { Package, ShoppingCart, Users, DollarSign, TrendingUp, Clock, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
+
+// Define Order interface to match Go backend schema
 interface Order {
-  id: string;
-  orderNumber: string;
-  createdAt: Date;
-  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
-  total: number;
+  id: string
+  orderNumber: string
+  createdAt: string
+  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED"
+  total: number
   user?: {
-    name: string | null;
-    email: string;
-  } | null;
+    name: string | null
+    email: string
+  } | null
   items: {
-    id: string;
-    name: string;
-    createdAt: Date;
-    updatedAt: Date;
-    productId: string;
-    price: number;
-    orderId: string;
-    quantity: number;
-    variant: string | null;
-  }[];
+    id: string
+    name: string
+    price: number
+    quantity: number
+    variant: string | null
+  }[]
 }
 
 // Define Product interface for low stock products
 interface LowStockProduct {
-  id: string;
-  name: string;
-  stockQuantity: number;
+  id: string
+  name: string
+  stockQuantity: number
 }
 
-interface AdminDashboardProps {
-  productsCount: number;
-  ordersCount: number;
-  customersCount: number;
-  totalSales: number;
-  lowStockProducts: LowStockProduct[];
-  pendingOrders: number;
-  recentOrders: Order[];
+interface DashboardStats {
+  productsCount: number
+  ordersCount: number
+  customersCount: number
+  totalSales: number
+  lowStockProducts: LowStockProduct[]
+  pendingOrders: number
+  recentOrders: Order[]
+  salesGrowth: number
+  ordersGrowth: number
+  customersGrowth: number
+  productsGrowth: number
 }
 
-export default async function AdminDashboard() {
-  let productsCount = 0;
-  let ordersCount = 0;
-  let customersCount = 0;
-  let totalSales = 0;
-  let lowStockProducts: LowStockProduct[] = [];
-  let pendingOrders = 0;
-  let recentOrders: Order[] = [];
+// Format currency helper function
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "KES",
+    minimumFractionDigits: 2,
+  }).format(amount / 100)
+}
 
-  try {
-    const [
-      productsCountResult,
-      ordersCountResult,
-      customersCountResult,
-      totalSalesResult,
-      lowStockProductsResult,
-      pendingOrdersResult,
-      recentOrdersResult,
-    ] = await Promise.all([
-      prisma.product.count().catch((error) => {
-        console.error("Failed to count products:", error);
-        return 0;
-      }),
-      prisma.order.count().catch((error) => {
-        console.error("Failed to count orders:", error);
-        return 0;
-      }),
-      prisma.user.count({ where: { role: "USER" } }).catch((error) => {
-        console.error("Failed to count customers:", error);
-        return 0;
-      }),
-      prisma.order.aggregate({
-        where: { status: { in: ["DELIVERED", "SHIPPED"] } },
-        _sum: { total: true },
-      }).catch((error) => {
-        console.error("Failed to aggregate total sales:", error);
-        return { _sum: { total: 0 } };
-      }),
-      prisma.product.findMany({
-        where: { stockQuantity: { lte: 10 }, inStock: true },
-        take: 5,
-        select: { id: true, name: true, stockQuantity: true },
-      }).catch((error) => {
-        console.error("Failed to fetch low stock products:", error);
-        return [];
-      }),
-      prisma.order.count({ where: { status: "PENDING" } }).catch((error) => {
-        console.error("Failed to count pending orders:", error);
-        return 0;
-      }),
-      prisma.order.findMany({
-        take: 5,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: { select: { name: true, email: true } },
-          items: true,
-        },
-      }).catch((error) => {
-        console.error("Failed to fetch recent orders:", error);
-        return [];
-      }),
-    ]);
+export default function AdminDashboard() {
+  const router = useRouter()
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-    productsCount = productsCountResult;
-    ordersCount = ordersCountResult;
-    customersCount = customersCountResult;
-    totalSales = totalSalesResult._sum.total ?? 0; // Handle null with default 0
-    lowStockProducts = lowStockProductsResult;
-    pendingOrders = pendingOrdersResult;
-    recentOrders = recentOrdersResult;
-  } catch (error) {
-    console.error("Unexpected error in AdminDashboard data fetching:", error);
+  useEffect(() => {
+    // Check if user is logged in and is admin
+    const token = localStorage.getItem("token")
+    const user = localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")!) : null
+
+    if (!token || !user || user.role !== "ADMIN") {
+      router.push("/login?redirect=/admin")
+      return
+    }
+
+    // Fetch dashboard stats
+    const fetchStats = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch("/api/admin", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch dashboard stats")
+        }
+
+        const data = await response.json()
+
+        // Transform the data to match our interface
+        const transformedData: DashboardStats = {
+          productsCount: data.data.productCount || 0,
+          ordersCount: data.data.orderCount || 0,
+          customersCount: data.data.userCount || 0,
+          totalSales: data.data.totalRevenue || 0,
+          lowStockProducts: data.data.lowStockProducts || [],
+          pendingOrders: data.data.pendingOrdersCount || 0,
+          recentOrders: data.data.recentOrders || [],
+          salesGrowth: data.data.salesGrowth || 12.5, // Default values if not provided by API
+          ordersGrowth: data.data.ordersGrowth || 8.2,
+          customersGrowth: data.data.customersGrowth || 5.7,
+          productsGrowth: data.data.productsGrowth || 3,
+        }
+
+        setStats(transformedData)
+      } catch (err) {
+        setError("Failed to load dashboard stats. Please try again later.")
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, index) => (
+            <Card key={index}>
+              <CardHeader className="pb-2">
+                <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-1/3 animate-pulse rounded bg-gray-200"></div>
+                <div className="mt-2 h-3 w-1/4 animate-pulse rounded bg-gray-200"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <div className="h-5 w-1/4 animate-pulse rounded bg-gray-200"></div>
+            <div className="h-4 w-1/3 animate-pulse rounded bg-gray-200"></div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-40 animate-pulse rounded bg-gray-200"></div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
-  const props: AdminDashboardProps = {
-    productsCount,
-    ordersCount,
-    customersCount,
-    totalSales,
-    lowStockProducts,
-    pendingOrders,
-    recentOrders,
-  };
+  if (error || !stats) {
+    return (
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-red-600">
+              {error || "Failed to load dashboard stats"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -149,8 +184,8 @@ export default async function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(props.totalSales)}</div>
-            <p className="text-xs text-muted-foreground">+12.5% from last month</p>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalSales)}</div>
+            <p className="text-xs text-muted-foreground">+{stats.salesGrowth}% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -159,8 +194,8 @@ export default async function AdminDashboard() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{props.ordersCount}</div>
-            <p className="text-xs text-muted-foreground">+8.2% from last month</p>
+            <div className="text-2xl font-bold">{stats.ordersCount}</div>
+            <p className="text-xs text-muted-foreground">+{stats.ordersGrowth}% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -169,8 +204,8 @@ export default async function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{props.customersCount}</div>
-            <p className="text-xs text-muted-foreground">+5.7% from last month</p>
+            <div className="text-2xl font-bold">{stats.customersCount}</div>
+            <p className="text-xs text-muted-foreground">+{stats.customersGrowth}% from last month</p>
           </CardContent>
         </Card>
         <Card>
@@ -179,8 +214,8 @@ export default async function AdminDashboard() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{props.productsCount}</div>
-            <p className="text-xs text-muted-foreground">+3 new this month</p>
+            <div className="text-2xl font-bold">{stats.productsCount}</div>
+            <p className="text-xs text-muted-foreground">+{stats.productsGrowth} new this month</p>
           </CardContent>
         </Card>
       </div>
@@ -190,13 +225,13 @@ export default async function AdminDashboard() {
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
           <CardDescription>
-            {props.recentOrders.length > 0
-              ? `Showing the latest ${props.recentOrders.length} orders`
+            {stats.recentOrders.length > 0
+              ? `Showing the latest ${stats.recentOrders.length} orders`
               : "No recent orders available"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {props.recentOrders.length > 0 ? (
+          {stats.recentOrders.length > 0 ? (
             <>
               <Table>
                 <TableHeader>
@@ -210,7 +245,7 @@ export default async function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {props.recentOrders.map((order) => (
+                  {stats.recentOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell className="font-medium">#{order.orderNumber}</TableCell>
                       <TableCell>{order.user?.name || order.user?.email || "Guest"}</TableCell>
@@ -221,12 +256,12 @@ export default async function AdminDashboard() {
                             order.status === "DELIVERED"
                               ? "bg-green-500"
                               : order.status === "SHIPPED"
-                              ? "bg-blue-500"
-                              : order.status === "PENDING"
-                              ? "bg-yellow-500"
-                              : order.status === "PROCESSING"
-                              ? "bg-orange-500"
-                              : "bg-red-500"
+                                ? "bg-blue-500"
+                                : order.status === "PENDING"
+                                  ? "bg-yellow-500"
+                                  : order.status === "PROCESSING"
+                                    ? "bg-orange-500"
+                                    : "bg-red-500"
                           }
                         >
                           {order.status.toLowerCase()}
@@ -263,13 +298,13 @@ export default async function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {props.lowStockProducts.length > 0 && (
+            {stats.lowStockProducts.length > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
-                <AlertCircle className="mt-0.5 h-5 w-5 text-red-5 00" />
+                <AlertCircle className="mt-0.5 h-5 w-5 text-red-500" />
                 <div>
                   <h4 className="font-semibold">Low Stock Alert</h4>
                   <p className="text-sm text-muted-foreground">
-                    {props.lowStockProducts.length} products are running low on inventory
+                    {stats.lowStockProducts.length} products are running low on inventory
                   </p>
                   <Link href="/admin/products?filter=low-stock" className="text-sm text-pink-600 hover:underline">
                     View Products
@@ -277,42 +312,37 @@ export default async function AdminDashboard() {
                 </div>
               </div>
             )}
-            {props.pendingOrders > 0 && (
+            {stats.pendingOrders > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
                 <Clock className="mt-0.5 h-5 w-5 text-yellow-500" />
                 <div>
                   <h4 className="font-semibold">Pending Orders</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {props.pendingOrders} orders are pending fulfillment
-                  </p>
+                  <p className="text-sm text-muted-foreground">{stats.pendingOrders} orders are pending fulfillment</p>
                   <Link href="/admin/orders?status=PENDING" className="text-sm text-pink-600 hover:underline">
                     View Orders
                   </Link>
                 </div>
               </div>
             )}
-            {props.totalSales > 0 && (
+            {stats.totalSales > 0 && (
               <div className="flex items-start gap-4 rounded-lg border p-4">
                 <TrendingUp className="mt-0.5 h-5 w-5 text-green-500" />
                 <div>
                   <h4 className="font-semibold">Sales Update</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Total sales: {formatCurrency(props.totalSales)}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Total sales: {formatCurrency(stats.totalSales)}</p>
                   <Link href="/admin/reports/sales" className="text-sm text-pink-600 hover:underline">
                     View Report
                   </Link>
                 </div>
               </div>
             )}
-            {props.lowStockProducts.length === 0 && props.pendingOrders === 0 && props.totalSales === 0 && (
+            {stats.lowStockProducts.length === 0 && stats.pendingOrders === 0 && stats.totalSales === 0 && (
               <p className="text-sm text-muted-foreground">No alerts or notifications at this time</p>
             )}
           </div>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
 
-export const revalidate = 3600; // Revalidate every hour (ISR)
