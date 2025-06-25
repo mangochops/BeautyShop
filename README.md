@@ -14,7 +14,7 @@ A full-featured e-commerce platform for beauty products built with Next.js, Pris
 ## Tech Stack
 
 - **Frontend**: Next.js, React, Tailwind CSS, shadcn/ui
-- **Backend**: Next.js API Routes, Prisma ORM
+- **Backend**: Next.js API Routes, Prisma ORM and Go
 - **Database**: PostgreSQL
 - **Authentication**: Custom authentication with cookies
 
