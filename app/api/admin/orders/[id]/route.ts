@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+
+const BACKEND_URL = "http://localhost:8080"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -11,37 +12,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 
   try {
-    const order = await prisma.order.findUnique({
-      where: { id: params.id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        items: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                images: {
-                  where: { isMain: true },
-                  take: 1,
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-
-    if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    const res = await fetch(`${BACKEND_URL}/orders/${params.id}`)
+    if (!res.ok) {
+      if (res.status === 404) {
+        return NextResponse.json({ error: "Order not found" }, { status: 404 })
+      }
+      throw new Error("Failed to fetch order")
     }
-
+    const order = await res.json()
     return NextResponse.json(order)
   } catch (error) {
     console.error("Error fetching order:", error)
@@ -58,19 +36,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   try {
     const body = await request.json()
-    const { status, paymentStatus, trackingNumber, notes } = body
-
-    const order = await prisma.order.update({
-      where: { id: params.id },
-      data: {
-        ...(status && { status }),
-        ...(paymentStatus && { paymentStatus }),
-        ...(trackingNumber !== undefined && { trackingNumber }),
-        ...(notes !== undefined && { notes }),
-      },
+    const res = await fetch(`${BACKEND_URL}/orders/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     })
-
-    return NextResponse.json(order)
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     console.error("Error updating order:", error)
     return NextResponse.json({ error: "Failed to update order" }, { status: 500 })

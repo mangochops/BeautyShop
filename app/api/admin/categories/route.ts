@@ -5,14 +5,9 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-    })
-
+    const res = await fetch("http://localhost:8080/categories")
+    if (!res.ok) throw new Error("Failed to fetch categories")
+    const categories = await res.json()
     return NextResponse.json(categories)
   } catch (error) {
     console.error("Error fetching categories:", error)
@@ -21,36 +16,24 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
+  const session = await getServerSession(authOptions);
 
   if (!session || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const body = await request.json()
-    const { name, description, image, parentId } = body
-
-    // Generate slug from name
-    const slug = name
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "")
-
-    const category = await prisma.category.create({
-      data: {
-        name,
-        slug,
-        description,
-        image,
-        ...(parentId && { parentId }),
-      },
-    })
-
-    return NextResponse.json(category, { status: 201 })
+    const body = await request.json();
+    const res = await fetch("http://localhost:8080/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
-    console.error("Error creating category:", error)
-    return NextResponse.json({ error: "Failed to create category" }, { status: 500 })
+    console.error("Error creating category:", error);
+    return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
   }
 }
 

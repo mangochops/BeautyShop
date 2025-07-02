@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+
+const BACKEND_URL = "http://localhost:8080"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -11,51 +12,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 
   try {
-    const customer = await prisma.user.findUnique({
-      where: { id: params.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        createdAt: true,
-        addresses: true,
-        orders: {
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 10,
-        },
-        _count: {
-          select: {
-            orders: true,
-            reviews: true,
-          },
-        },
-      },
-    })
-
-    if (!customer) {
-      return NextResponse.json({ error: "Customer not found" }, { status: 404 })
+    const res = await fetch(`${BACKEND_URL}/customers/${params.id}`)
+    if (!res.ok) {
+      if (res.status === 404) {
+        return NextResponse.json({ error: "Customer not found" }, { status: 404 })
+      }
+      throw new Error("Failed to fetch customer")
     }
-
-    // Calculate total spent
-    const totalSpent = await prisma.order.aggregate({
-      where: {
-        userId: customer.id,
-        status: {
-          in: ["DELIVERED", "SHIPPED"],
-        },
-      },
-      _sum: {
-        total: true,
-      },
-    })
-
-    return NextResponse.json({
-      ...customer,
-      totalSpent: totalSpent._sum.total || 0,
-    })
+    const customer = await res.json()
+    return NextResponse.json(customer)
   } catch (error) {
     console.error("Error fetching customer:", error)
     return NextResponse.json({ error: "Failed to fetch customer" }, { status: 500 })

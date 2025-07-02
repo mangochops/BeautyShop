@@ -1,25 +1,19 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+const BACKEND_URL = "http://localhost:8080"
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const category = await prisma.category.findUnique({
-      where: { id: params.id },
-      include: {
-        parent: true,
-        children: true,
-        _count: {
-          select: { products: true },
-        },
-      },
-    })
-
-    if (!category) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 })
+    const res = await fetch(`${BACKEND_URL}/categories/${params.id}`)
+    if (!res.ok) {
+      if (res.status === 404) {
+        return NextResponse.json({ error: "Category not found" }, { status: 404 })
+      }
+      throw new Error("Failed to fetch category")
     }
-
+    const category = await res.json()
     return NextResponse.json(category)
   } catch (error) {
     console.error("Error fetching category:", error)
@@ -36,29 +30,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   try {
     const body = await request.json()
-    const { name, description, image, parentId } = body
-
-    // Generate slug from name if name is changed
-    let slug
-    if (name) {
-      slug = name
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")
-    }
-
-    const category = await prisma.category.update({
-      where: { id: params.id },
-      data: {
-        ...(name && { name }),
-        ...(slug && { slug }),
-        ...(description !== undefined && { description }),
-        ...(image !== undefined && { image }),
-        ...(parentId !== undefined && { parentId }),
-      },
+    const res = await fetch(`${BACKEND_URL}/categories/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     })
-
-    return NextResponse.json(category)
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     console.error("Error updating category:", error)
     return NextResponse.json({ error: "Failed to update category" }, { status: 500 })
@@ -73,23 +51,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 
   try {
-    // Check if category has products
-    const productsCount = await prisma.product.count({
-      where: { categoryId: params.id },
+    const res = await fetch(`${BACKEND_URL}/categories/${params.id}`, {
+      method: "DELETE",
     })
-
-    if (productsCount > 0) {
-      return NextResponse.json(
-        { error: "Cannot delete category with products. Please move or delete the products first." },
-        { status: 400 },
-      )
-    }
-
-    await prisma.category.delete({
-      where: { id: params.id },
-    })
-
-    return NextResponse.json({ success: true })
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     console.error("Error deleting category:", error)
     return NextResponse.json({ error: "Failed to delete category" }, { status: 500 })

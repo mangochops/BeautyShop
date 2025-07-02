@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+const BACKEND_URL = "http://localhost:8080"
+
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const product = await prisma.product.findUnique({
-      where: { id: params.id },
-      include: {
-        category: true,
-        images: true,
-        attributes: true,
-        variants: true,
-      },
-    })
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    const res = await fetch(`${BACKEND_URL}/products/${params.id}`)
+    if (!res.ok) {
+      if (res.status === 404) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 })
+      }
+      throw new Error("Failed to fetch product")
     }
-
+    const product = await res.json()
     return NextResponse.json(product)
   } catch (error) {
     console.error("Error fetching product:", error)
@@ -35,57 +30,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   try {
     const body = await request.json()
-    const { name, description, price, originalPrice, categoryId, featured, inStock, stockQuantity, sku, images } = body
-
-    // Generate slug from name if name is changed
-    let slug
-    if (name) {
-      slug = name
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")
-    }
-
-    // Update product
-    const product = await prisma.product.update({
-      where: { id: params.id },
-      data: {
-        ...(name && { name }),
-        ...(slug && { slug }),
-        ...(description && { description }),
-        ...(price !== undefined && { price }),
-        ...(originalPrice !== undefined && { originalPrice }),
-        ...(categoryId && { categoryId }),
-        ...(featured !== undefined && { featured }),
-        ...(inStock !== undefined && { inStock }),
-        ...(stockQuantity !== undefined && { stockQuantity }),
-        ...(sku && { sku }),
-      },
+    const res = await fetch(`${BACKEND_URL}/products/${params.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     })
-
-    // Update product images
-    if (images && images.length > 0) {
-      // Delete existing images
-      await prisma.productImage.deleteMany({
-        where: { productId: params.id },
-      })
-
-      // Add new images
-      await Promise.all(
-        images.map((image: { url: string; alt?: string; isMain: boolean }, index: number) =>
-          prisma.productImage.create({
-            data: {
-              url: image.url,
-              alt: image.alt || product.name,
-              isMain: image.isMain || index === 0,
-              productId: product.id,
-            },
-          }),
-        ),
-      )
-    }
-
-    return NextResponse.json(product)
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     console.error("Error updating product:", error)
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
@@ -100,11 +51,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 
   try {
-    await prisma.product.delete({
-      where: { id: params.id },
+    const res = await fetch(`${BACKEND_URL}/products/${params.id}`, {
+      method: "DELETE",
     })
-
-    return NextResponse.json({ success: true })
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     console.error("Error deleting product:", error)
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })
