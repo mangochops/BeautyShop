@@ -8,7 +8,7 @@ A full-featured e-commerce platform for beauty products built with Next.js, Pris
 - Product catalog with categories, filtering, and search
 - Shopping cart and checkout process
 - Admin dashboard for managing products, orders, and customers
-- Authentication and authorization
+- Authentication
 - Database integration with Prisma ORM
 
 ## Tech Stack
